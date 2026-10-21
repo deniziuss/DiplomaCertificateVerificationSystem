@@ -1,19 +1,37 @@
-﻿using System.Security.Cryptography;
+﻿
+using System;
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using DiplomaCertificateVerificationSystem.Models;
 
-public class CredentialHashService
+namespace DiplomaCertificateVerificationSystem.Services
 {
-    public string ComputeHash(string rawData)
+    public static class CredentialHashService
     {
-        using (SHA256 sha256Hash = SHA256.Create())
+        public static string CalculateHash(DigitalCredential credential)
         {
-            byte[] bytes = sha256Hash.ComputeHash(Encoding.UTF8.GetBytes(rawData));
-            StringBuilder builder = new StringBuilder();
-            foreach (byte b in bytes)
+            ArgumentNullException.ThrowIfNull(credential);
+
+            string data = JsonSerializer.Serialize(new
             {
-                builder.Append(b.ToString("x2"));
-            }
-            return builder.ToString();
+                CredentialId = credential.CredentialId,
+                StudentId = credential.StudentId,
+                UniversityId = credential.UniversityId,
+                CredentialType = credential.GetCredentialType(),
+                Title = credential.Title,
+                ProgramOrCourse = credential.ProgramOrCourse,
+                AdditionalInformation = credential.AdditionalInformation,
+                IssueDate = credential.IssueDate.ToString(
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture)
+            });
+
+            byte[] bytes = Encoding.UTF8.GetBytes(data);
+            byte[] hash = SHA256.HashData(bytes);
+
+            return Convert.ToHexString(hash);
         }
     }
 }
