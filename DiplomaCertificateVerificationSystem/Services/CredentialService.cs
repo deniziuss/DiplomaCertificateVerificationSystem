@@ -1,74 +1,86 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using DiplomaCertificateVerificationSystem.Data;
+using DiplomaCertificateVerificationSystem.Models;
 
-public class CredentialService
+namespace DiplomaCertificateVerificationSystem.Services
 {
-    private List<DigitalCredential> credentials;
-    private readonly CredentialRepository repository;
-    private readonly CredentialHashService hashService;
-
-    public CredentialService()
+    public class CredentialService
     {
-        repository = new CredentialRepository();
-        hashService = new CredentialHashService();
-        credentials = repository.Load(); // Uygulama açılınca kayıtlıları yükle
-    }
+        private readonly List<DigitalCredential> credentials;
+        private readonly CredentialRepository repository;
 
-    // Benzersiz ID ve Diploma/Sertifika Üretme
-    public DigitalCredential IssueCredential(string type, string title, string studentName, string universityName, DateTime issueDate, string additionalInfo)
-    {
-        // 1. Benzersiz Credential ID üret
-        string credentialId = "CRED-" + Guid.NewGuid().ToString().Substring(0, 8).ToUpper();
-
-        DigitalCredential credential;
-
-        // 2. Türüne göre nesne türet (Polimorfizm)
-        if (type.Equals("Diploma", StringComparison.OrdinalIgnoreCase))
+        public CredentialService(CredentialRepository? repository = null)
         {
-            credential = new Diploma
-            {
-                CredentialID = credentialId,
-                Title = title,
-                StudentName = studentName,
-                UniversityName = universityName,
-                IssueDate = issueDate,
-                AdditionalInfo = additionalInfo,
-                Status = "Valid"
-            };
-        }
-        else
-        {
-            credential = new Certificate
-            {
-                CredentialID = credentialId,
-                Title = title,
-                StudentName = studentName,
-                UniversityName = universityName,
-                IssueDate = issueDate,
-                AdditionalInfo = additionalInfo,
-                Status = "Valid"
-            };
+            this.repository = repository ?? new CredentialRepository();
+            credentials = this.repository.Load();
         }
 
-        // 3. Hash Hesapla (Deniz'in servisi üzerinden)
-        string rawData = $"{credential.CredentialID}-{credential.StudentName}-{credential.UniversityName}-{credential.Title}-{credential.IssueDate}";
-        credential.CredentialHash = hashService.ComputeHash(rawData);
+        public DigitalCredential PrepareCredential(
+            string type,
+            Guid studentId,
+            Guid universityId,
+            string title,
+            string programOrCourse,
+            DateTime issueDate,
+            string additionalInformation)
+        {
+            if (studentId == Guid.Empty || universityId == Guid.Empty)
+                throw new ArgumentException("Select a valid student and university.");
 
-        // 4. Listeye ekle ve diske kaydet
-        credentials.Add(credential);
-        repository.Save(credentials);
+            if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(programOrCourse))
+                throw new ArgumentException("Title and program/course are required.");
 
-        return credential;
-    }
+            DigitalCredential credential;
 
-    public List<DigitalCredential> GetAllCredentials()
-    {
-        return credentials;
-    }
+            if (string.Equals(type, "Diploma", StringComparison.OrdinalIgnoreCase))
+            {
+                credential = new Diploma(studentId, universityId, title.Trim(),
+                    programOrCourse.Trim(), additionalInformation, issueDate);
+            }
+            else if (string.Equals(type, "Certificate", StringComparison.OrdinalIgnoreCase))
+            {
+                credential = new Certificate(studentId, universityId, title.Trim(),
+                    programOrCourse.Trim(), additionalInformation, issueDate);
+            }
+            else
+            {
+                throw new ArgumentException("Select a credential type.", nameof(type));
+            }
 
-    public DigitalCredential GetCredentialById(string credentialId)
-    {
-        return credentials.FirstOrDefault(c => c.CredentialID == credentialId);
+            credential.DocumentHash = CredentialHashService.CalculateHash(credential);
+            return credential;
+        }
+
+        public DigitalCredential IssueCredential(DigitalCredential credential)
+        {
+            ArgumentNullException.ThrowIfNull(credential);
+
+            if (credentials.Any(c => c.CredentialId == credential.CredentialId))
+                throw new InvalidOperationException("This credential has already been issued.");
+
+            if (!CredentialHashService.VerifyHash(credential))
+                throw new InvalidOperationException("Credential data does not match its hash.");
+
+            credential.Status = "Issued";
+
+            // Save first so a failed disk write does not add an in-memory credential.
+            var updatedCredentials = new List<DigitalCredential>(credentials) { credential };
+            repository.Save(updatedCredentials);
+            credentials.Add(credential);
+
+            return credential;
+        }
+
+        public IReadOnlyList<DigitalCredential> GetAllCredentials()
+        {
+            return credentials.AsReadOnly();
+        }
+
+        public DigitalCredential? GetCredentialById(Guid credentialId)
+        {
+            return credentials.FirstOrDefault(c => c.CredentialId == credentialId);
+        }
     }
 }
