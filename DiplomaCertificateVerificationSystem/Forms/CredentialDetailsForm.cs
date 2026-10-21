@@ -124,7 +124,7 @@ namespace DiplomaCertificateVerificationSystem.Forms
             root.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
             root.RowStyles.Add(
-                new RowStyle(SizeType.Absolute, 120));
+                new RowStyle(SizeType.Absolute, 160));
             root.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, 75));
 
