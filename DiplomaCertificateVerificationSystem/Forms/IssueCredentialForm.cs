@@ -1,36 +1,118 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Text;
+using System;
 using System.Windows.Forms;
+using DiplomaCertificateVerificationSystem.Models;
+using DiplomaCertificateVerificationSystem.Services;
 
 namespace DiplomaCertificateVerificationSystem.Forms
 {
     public partial class IssueCredentialForm : Form
     {
-        private CredentialService credentialService;
-        private DigitalCredential lastCreatedCredential;
+        private readonly CredentialService credentialService;
+        private DigitalCredential? draftCredential;
+        private DigitalCredential? lastCreatedCredential;
 
         public IssueCredentialForm()
         {
             InitializeComponent();
             credentialService = new CredentialService();
             LoadComboBoxData();
+            Text = "Issue Diploma or Certificate";
         }
 
         private void LoadComboBoxData()
         {
-            // Populate ComboBoxes with sample data
+            cmbCredentialType.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbStudent.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbUniversity.DropDownStyle = ComboBoxStyle.DropDownList;
+
             cmbCredentialType.Items.Add("Diploma");
             cmbCredentialType.Items.Add("Certificate");
 
-            cmbUniversity.Items.Add("Rīgas Tehniskā universitāte");
-            cmbUniversity.Items.Add("Afyon Kocatepe Üniversitesi");
+            // Temporary demo records. Replace these with Team 1 and Team 2 data.
+            cmbUniversity.Items.Add(new SelectionItem(
+                "50000000-0000-4000-8000-000000000001", "Rīgas Tehniskā universitāte"));
+            cmbUniversity.Items.Add(new SelectionItem(
+                "50000000-0000-4000-8000-000000000002", "Afyon Kocatepe Üniversitesi"));
 
-            cmbStudent.Items.Add("Enes Taş");
-            cmbStudent.Items.Add("Nevzat Deniz Fersiz");
+            cmbStudent.Items.Add(new SelectionItem(
+                "60000000-0000-4000-8000-000000000001", "Enes Taş"));
+            cmbStudent.Items.Add(new SelectionItem(
+                "60000000-0000-4000-8000-000000000002", "Nevzat Deniz Fersiz"));
+        }
+
+        private DigitalCredential CreateDraftFromForm()
+        {
+            if (cmbCredentialType.SelectedItem is not string type ||
+                cmbStudent.SelectedItem is not SelectionItem student ||
+                cmbUniversity.SelectedItem is not SelectionItem university)
+            {
+                throw new ArgumentException("Select a credential type, student, and university.");
+            }
+
+            return credentialService.PrepareCredential(
+                type,
+                student.Id,
+                university.Id,
+                txtTitle.Text,
+                txtProgram.Text,
+                dtpIssueDate.Value.Date,
+                txtAdditionalInfo.Text);
+        }
+
+        private void btnGenerateHash_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                draftCredential = CreateDraftFromForm();
+                MessageBox.Show(
+                    $"Draft credential hash:\n{draftCredential.DocumentHash}\n\n" +
+                    "This hash will be used when the credential is issued unless the details change.",
+                    "SHA-256 Preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (ArgumentException ex)
+            {
+                MessageBox.Show(ex.Message, "Missing Information",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void btnIssueCredential_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                draftCredential ??= CreateDraftFromForm();
+                lastCreatedCredential = credentialService.IssueCredential(draftCredential);
+                draftCredential = null;
+
+                MessageBox.Show(
+                    $"Credential created and saved.\nID: {lastCreatedCredential.CredentialId}",
+                    "Credential Issued", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                var student = (SelectionItem)cmbStudent.SelectedItem!;
+                var university = (SelectionItem)cmbUniversity.SelectedItem!;
+                using var detailsForm = new CredentialDetailsForm(
+                    lastCreatedCredential, student.Name, university.Name);
+                detailsForm.ShowDialog(this);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or System.IO.IOException)
+            {
+                MessageBox.Show(ex.Message, "Cannot Issue Credential",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnRegisterBlockchain_Click(object sender, EventArgs e)
+        {
+            if (lastCreatedCredential == null)
+            {
+                MessageBox.Show("Issue a credential first.", "Warning",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            MessageBox.Show(
+                "The credential was saved locally. Blockchain registration is not available yet.",
+                "Integration Pending", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void btnClear_Click(object sender, EventArgs e)
@@ -41,97 +123,41 @@ namespace DiplomaCertificateVerificationSystem.Forms
             cmbStudent.SelectedIndex = -1;
             cmbUniversity.SelectedIndex = -1;
             cmbCredentialType.SelectedIndex = -1;
+            dtpIssueDate.Value = DateTime.Today;
+            ResetDraft();
+        }
+
+        private void ResetDraft()
+        {
+            draftCredential = null;
             lastCreatedCredential = null;
         }
 
-        private void btnGenerateHash_Click(object sender, EventArgs e)
-        {
-            if (string.IsNullOrWhiteSpace(txtTitle.Text) || cmbStudent.SelectedItem == null)
-            {
-                MessageBox.Show("Please fill in the required fields!", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            // Generate hash preview
-            var hashService = new CredentialHashService();
-            string rawData = $"{cmbStudent.Text}-{cmbUniversity.Text}-{txtTitle.Text}-{dtpIssueDate.Value}";
-            string previewHash = hashService.ComputeHash(rawData);
-
-            MessageBox.Show($"Temporary Credential Hash Value:\n{previewHash}", "Hash Preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
-        private void btnIssueCredential_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                if (cmbCredentialType.SelectedItem == null || cmbStudent.SelectedItem == null || cmbUniversity.SelectedItem == null)
-                {
-                    MessageBox.Show("Please make all required selections!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    return;
-                }
-
-                string type = cmbCredentialType.SelectedItem.ToString();
-                string student = cmbStudent.SelectedItem.ToString();
-                string university = cmbUniversity.SelectedItem.ToString();
-                string title = txtTitle.Text;
-                string program = txtProgram.Text;
-                DateTime issueDate = dtpIssueDate.Value;
-                string info = txtAdditionalInfo.Text;
-
-                // Create credential via service and save to disk
-                lastCreatedCredential = credentialService.IssueCredential(type, title, student, university, issueDate, info);
-
-                MessageBox.Show($"Credential created successfully!\nID: {lastCreatedCredential.CredentialID}", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("An error occurred: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void btnRegisterBlockchain_Click(object sender, EventArgs e)
-        {
-            if (lastCreatedCredential == null)
-            {
-                MessageBox.Show("You must create a credential first!", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            // Blockchain registration simulation
-            MessageBox.Show($"Credential ({lastCreatedCredential.CredentialID}) successfully registered to the blockchain network!", "Blockchain Registration", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
-        private void dtpIssueDate_ValueChanged(object sender, EventArgs e)
-        {
-        }
-
-        private void cmbStudent_SelectedIndexChanged(object sender, EventArgs e)
-        {
-        }
-
-        private void cmbUniversity_SelectedIndexChanged(object sender, EventArgs e)
-        {
-        }
-
-        private void cmbCredentialType_SelectedIndexChanged(object sender, EventArgs e)
-        {
-        }
-
-        private void txtTitle_TextChanged(object sender, EventArgs e)
-        {
-        }
-
-        private void txtProgram_TextChanged(object sender, EventArgs e)
-        {
-        }
-
-        private void txtAdditionalInfo_TextChanged(object sender, EventArgs e)
-        {
-        }
+        // The hash preview is invalidated whenever its input changes.
+        private void dtpIssueDate_ValueChanged(object sender, EventArgs e) => ResetDraft();
+        private void cmbStudent_SelectedIndexChanged(object sender, EventArgs e) => ResetDraft();
+        private void cmbUniversity_SelectedIndexChanged(object sender, EventArgs e) => ResetDraft();
+        private void cmbCredentialType_SelectedIndexChanged(object sender, EventArgs e) => ResetDraft();
+        private void txtTitle_TextChanged(object sender, EventArgs e) => ResetDraft();
+        private void txtProgram_TextChanged(object sender, EventArgs e) => ResetDraft();
+        private void txtAdditionalInfo_TextChanged(object sender, EventArgs e) => ResetDraft();
 
         private void IssueCredentialForm_Load(object sender, EventArgs e)
         {
+        }
 
+        private sealed class SelectionItem
+        {
+            public Guid Id { get; }
+            public string Name { get; }
+
+            public SelectionItem(string id, string name)
+            {
+                Id = Guid.Parse(id);
+                Name = name;
+            }
+
+            public override string ToString() => Name;
         }
     }
 }
