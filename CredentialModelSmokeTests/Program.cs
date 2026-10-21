@@ -56,4 +56,60 @@ Check(!CredentialHashService.VerifyHash(restored[0]), "Changed title is detected
 restored[1].DocumentHash = "";
 Check(!CredentialHashService.VerifyHash(restored[1]), "Missing hash is rejected");
 
+
+// The service and repository should work together without changing the credential ID.
+string testFile = Path.Combine(Path.GetTempPath(), "credential-test-" + Guid.NewGuid() + ".json");
+
+try
+{
+    var repository = new DiplomaCertificateVerificationSystem.Data.CredentialRepository(testFile);
+    var service = new DiplomaCertificateVerificationSystem.Services.CredentialService(repository);
+    var draft = service.PrepareCredential(
+        "Diploma", studentId, universityId, "Test Diploma",
+        "Information Systems", issueDate, "Graduated");
+    Guid issuedId = draft.CredentialId;
+
+    Check(CredentialHashService.VerifyHash(draft), "Prepared credential hash is valid");
+    service.IssueCredential(draft);
+    Check(File.Exists(testFile), "Issued credential saved to disk");
+
+    var reloadedService = new DiplomaCertificateVerificationSystem.Services.CredentialService(repository);
+    var saved = reloadedService.GetCredentialById(issuedId);
+    Check(saved is Diploma, "Issued diploma reloaded from JSON");
+    Check(saved?.CredentialId == issuedId, "Issued credential ID preserved");
+    Check(saved != null && CredentialHashService.VerifyHash(saved), "Saved credential hash is valid");
+
+    bool duplicateRejected = false;
+    try
+    {
+        service.IssueCredential(draft);
+    }
+    catch (InvalidOperationException)
+    {
+        duplicateRejected = true;
+    }
+    Check(duplicateRejected, "Duplicate issue rejected");
+
+    File.WriteAllText(testFile, "{ invalid json");
+    bool invalidFileRejected = false;
+    try
+    {
+        repository.Load();
+    }
+    catch (InvalidDataException)
+    {
+        invalidFileRejected = true;
+    }
+
+    Check(invalidFileRejected, "Invalid JSON produces an error");
+    Check(File.ReadAllText(testFile) == "{ invalid json", "Invalid JSON file is not overwritten");
+}
+finally
+{
+    if (File.Exists(testFile))
+        File.Delete(testFile);
+    if (File.Exists(testFile + ".tmp"))
+        File.Delete(testFile + ".tmp");
+}
+
 Console.WriteLine("All credential model checks passed.");
