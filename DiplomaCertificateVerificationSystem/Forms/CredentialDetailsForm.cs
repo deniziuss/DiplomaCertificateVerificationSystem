@@ -1,4 +1,5 @@
 ﻿using DiplomaCertificateVerificationSystem.Models;
+using DiplomaCertificateVerificationSystem.Services;
 using System;
 using System.Drawing;
 using System.Windows.Forms;
@@ -17,6 +18,7 @@ namespace DiplomaCertificateVerificationSystem.Forms
         private Label lblStatusValue = null!;
 
         private TextBox txtCredentialHash = null!;
+        private Label lblHashIntegrityValue = null!;
 
         public CredentialDetailsForm()
         {
@@ -76,6 +78,23 @@ namespace DiplomaCertificateVerificationSystem.Forms
                 string.IsNullOrWhiteSpace(credential.DocumentHash)
                 ? "Not generated"
                 : credential.DocumentHash;
+
+            // Local hash integrity is separate from blockchain verification.
+            if (string.IsNullOrWhiteSpace(credential.DocumentHash))
+            {
+                lblHashIntegrityValue.Text = "Integrity: No hash generated";
+                lblHashIntegrityValue.ForeColor = Color.DarkOrange;
+            }
+            else if (CredentialHashService.VerifyHash(credential))
+            {
+                lblHashIntegrityValue.Text = "Integrity: Hash matches document data (local check)";
+                lblHashIntegrityValue.ForeColor = Color.DarkGreen;
+            }
+            else
+            {
+                lblHashIntegrityValue.Text = "Integrity: Hash mismatch - document may have changed";
+                lblHashIntegrityValue.ForeColor = Color.DarkRed;
+            }
         }
 
 
@@ -201,7 +220,7 @@ namespace DiplomaCertificateVerificationSystem.Forms
             {
                 Dock = DockStyle.Fill,
                 ColumnCount = 1,
-                RowCount = 2,
+                RowCount = 3,
                 BackColor = Color.White,
                 Padding = new Padding(18),
                 Margin = new Padding(0, 12, 0, 0)
@@ -209,6 +228,8 @@ namespace DiplomaCertificateVerificationSystem.Forms
 
             hashPanel.RowStyles.Add(
                 new RowStyle(SizeType.Absolute, 28));
+            hashPanel.RowStyles.Add(
+                new RowStyle(SizeType.Absolute, 24));
             hashPanel.RowStyles.Add(
                 new RowStyle(SizeType.Percent, 100));
 
@@ -218,6 +239,14 @@ namespace DiplomaCertificateVerificationSystem.Forms
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 ForeColor = Color.FromArgb(70, 85, 110),
                 Dock = DockStyle.Fill
+            };
+
+            lblHashIntegrityValue = new Label
+            {
+                Text = "Integrity: Not checked",
+                Font = new Font("Segoe UI", 9),
+                Dock = DockStyle.Fill,
+                ForeColor = Color.Gray
             };
 
             txtCredentialHash = new TextBox
@@ -234,7 +263,8 @@ namespace DiplomaCertificateVerificationSystem.Forms
             };
 
             hashPanel.Controls.Add(hashTitle, 0, 0);
-            hashPanel.Controls.Add(txtCredentialHash, 0, 1);
+            hashPanel.Controls.Add(lblHashIntegrityValue, 0, 1);
+            hashPanel.Controls.Add(txtCredentialHash, 0, 2);
 
             root.Controls.Add(hashPanel, 0, 2);
 
