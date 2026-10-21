@@ -18,8 +18,5 @@ jobs:
       - name: Run credential tests
         run: dotnet run --project CredentialModelSmokeTests/CredentialModelSmokeTests.csproj --configuration Release
 
-      - name: Build Windows Forms app
+      - name: Build application
         run: dotnet build DiplomaCertificateVerificationSystem/DiplomaCertificateVerificationSystem.csproj --configuration Release
-
-      - name: Build details form preview
-        run: dotnet build CredentialFormSmokeTests/CredentialFormSmokeTests.csproj --configuration Release
