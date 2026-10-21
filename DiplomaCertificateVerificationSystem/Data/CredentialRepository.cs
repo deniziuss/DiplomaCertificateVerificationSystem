@@ -1,59 +1,58 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using DiplomaCertificateVerificationSystem.Models;
 
-public class CredentialRepository
+namespace DiplomaCertificateVerificationSystem.Data
 {
-    private readonly string filePath = "credentials.json";
-
-    public void Save(List<DigitalCredential> credentials)
+    public class CredentialRepository
     {
-        try
+        private readonly string filePath;
+
+        public CredentialRepository(string? filePath = null)
         {
+            this.filePath = filePath ?? Path.Combine(AppContext.BaseDirectory, "credentials.json");
+        }
+
+        public void Save(List<DigitalCredential> credentials)
+        {
+            ArgumentNullException.ThrowIfNull(credentials);
+
             var options = new JsonSerializerOptions { WriteIndented = true };
-            string jsonString = JsonSerializer.Serialize(credentials, options);
-            File.WriteAllText(filePath, jsonString);
-        }
-        catch (Exception ex)
-        {
-            throw new Exception("Veriler kaydedilirken hata oluştu: " + ex.Message);
-        }
-    }
+            string json = JsonSerializer.Serialize(credentials, options);
 
-    public List<DigitalCredential> Load()
-    {
-        // Dosya yoksa veya içi tamamen boşsa yeni liste döndür
-        if (!File.Exists(filePath))
-        {
-            return new List<DigitalCredential>();
+            string? folder = Path.GetDirectoryName(Path.GetFullPath(filePath));
+            if (folder != null)
+                Directory.CreateDirectory(folder);
+
+            // Write to a temporary file before replacing the saved credentials.
+            string tempFile = filePath + ".tmp";
+            File.WriteAllText(tempFile, json);
+            File.Move(tempFile, filePath, overwrite: true);
         }
 
-        try
+        public List<DigitalCredential> Load()
         {
-            string jsonString = File.ReadAllText(filePath);
-            if (string.IsNullOrWhiteSpace(jsonString))
-            {
+            if (!File.Exists(filePath))
                 return new List<DigitalCredential>();
-            }
 
-            var credentials = JsonSerializer.Deserialize<List<DigitalCredential>>(jsonString);
-            return credentials ?? new List<DigitalCredential>();
-        }
-        catch (Exception)
-        {
-            // Kendi kendine temizleme: Dosya bozulmuşsa veya uyumsuzluk varsa
-            // hatayı patlatmak yerine dosyayı sıfırla ve boş liste döndür
+            string json = File.ReadAllText(filePath);
+            if (string.IsNullOrWhiteSpace(json))
+                return new List<DigitalCredential>();
+
             try
             {
-                File.WriteAllText(filePath, "[]");
+                return JsonSerializer.Deserialize<List<DigitalCredential>>(json)
+                       ?? new List<DigitalCredential>();
             }
-            catch
+            catch (Exception ex) when (
+                ex is JsonException or NotSupportedException or ArgumentException)
             {
-                // Dosya erişim hatası olursa yoksay
+                // Never overwrite data when the file cannot be read.
+                throw new InvalidDataException(
+                    "The credentials file could not be loaded. The original file was not changed.", ex);
             }
-
-            return new List<DigitalCredential>();
         }
     }
 }

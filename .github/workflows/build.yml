@@ -1,0 +1,25 @@
+name: Build and test
+
+on:
+  push:
+    branches: [master, feature/team3-combined]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run credential tests
+        run: dotnet run --project CredentialModelSmokeTests/CredentialModelSmokeTests.csproj --configuration Release
+
+      - name: Build Windows Forms app
+        run: dotnet build DiplomaCertificateVerificationSystem/DiplomaCertificateVerificationSystem.csproj --configuration Release
+
+      - name: Build details form preview
+        run: dotnet build CredentialFormSmokeTests/CredentialFormSmokeTests.csproj --configuration Release

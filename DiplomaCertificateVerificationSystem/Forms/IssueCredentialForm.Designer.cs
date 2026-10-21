@@ -154,7 +154,7 @@
             label1.Name = "label1";
             label1.Size = new Size(112, 20);
             label1.TabIndex = 11;
-            label1.Text = "Credential Type";
+            label1.Text = "Student Name";
             // 
             // label2
             // 
@@ -172,7 +172,7 @@
             label3.Name = "label3";
             label3.Size = new Size(104, 20);
             label3.TabIndex = 13;
-            label3.Text = "Student Name";
+            label3.Text = "Credential Type";
             // 
             // label4
             // 

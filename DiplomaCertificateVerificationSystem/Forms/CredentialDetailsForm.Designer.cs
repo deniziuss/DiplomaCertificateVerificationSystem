@@ -28,10 +28,19 @@
         /// </summary>
         private void InitializeComponent()
         {
-            this.components = new System.ComponentModel.Container();
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 450);
-            this.Text = "CredentialDetailsForm";
+            SuspendLayout();
+            // 
+            // CredentialDetailsForm
+            // 
+            AutoScaleDimensions = new SizeF(10F, 25F);
+            AutoScaleMode = AutoScaleMode.Font;
+            ClientSize = new Size(878, 594);
+            FormBorderStyle = FormBorderStyle.FixedSingle;
+            MaximizeBox = false;
+            Name = "CredentialDetailsForm";
+            StartPosition = FormStartPosition.CenterScreen;
+            Text = "Credential Details";
+            ResumeLayout(false);
         }
 
         #endregion
