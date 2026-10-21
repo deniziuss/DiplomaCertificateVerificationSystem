@@ -10,6 +10,24 @@ namespace DiplomaCertificateVerificationSystem.Services
 {
     public static class CredentialHashService
     {
+        // Checks local credential data against its stored SHA-256 hash.
+        // This is an integrity check, not blockchain or signature verification.
+        public static bool VerifyHash(DigitalCredential credential)
+        {
+            ArgumentNullException.ThrowIfNull(credential);
+
+            if (string.IsNullOrWhiteSpace(credential.DocumentHash))
+            {
+                return false;
+            }
+
+            string expectedHash = CalculateHash(credential);
+            return string.Equals(
+                expectedHash,
+                credential.DocumentHash,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         public static string CalculateHash(DigitalCredential credential)
         {
             ArgumentNullException.ThrowIfNull(credential);
