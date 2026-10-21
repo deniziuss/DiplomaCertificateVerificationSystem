@@ -37,10 +37,8 @@ The first command tests models, hashing, serialization and repository operations
 
 ## Branches
 
-- `master` — shared integration branch.
-- `feature/enes-issuance` — preserved original issuance implementation by Enes.
-- `feature/deniz-models` — preserved original models, hashing and details view by Deniz.
-- `feature/deniz-model-persistence` — Deniz's JSON persistence and integrity improvements.
-- `backup/master-before-team3-integration-20261021` — snapshot of the original `master` before integration.
+- `master`: combined Team 3 project.
+- `deniz`: credential models, hashing, details form and persistence changes.
+- `enes`: Enes's original issuance form, service and repository.
 
-Continue changes in new feature branches and merge with pull requests. Avoid force pushing to `master`.
+Work on a separate branch when making changes and open a pull request to `master`. Do not force-push to `master`.
